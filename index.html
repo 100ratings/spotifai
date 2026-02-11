@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Song Alphabet - Crie Playlists Alfabéticas no Spotify</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">🎵 Song Alphabet</h1>
+                <button id="spotifyBtn" class="spotify-btn">Conectar com Spotify</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main">
+            <!-- Left Sidebar - Alphabet Navigation -->
+            <aside class="sidebar">
+                <div class="alphabet-nav">
+                    <button class="letter-btn active" data-letter="A">A</button>
+                    <button class="letter-btn" data-letter="B">B</button>
+                    <button class="letter-btn" data-letter="C">C</button>
+                    <button class="letter-btn" data-letter="D">D</button>
+                    <button class="letter-btn" data-letter="E">E</button>
+                    <button class="letter-btn" data-letter="F">F</button>
+                    <button class="letter-btn" data-letter="G">G</button>
+                    <button class="letter-btn" data-letter="H">H</button>
+                    <button class="letter-btn" data-letter="I">I</button>
+                    <button class="letter-btn" data-letter="J">J</button>
+                    <button class="letter-btn" data-letter="K">K</button>
+                    <button class="letter-btn" data-letter="L">L</button>
+                    <button class="letter-btn" data-letter="M">M</button>
+                    <button class="letter-btn" data-letter="N">N</button>
+                    <button class="letter-btn" data-letter="O">O</button>
+                    <button class="letter-btn" data-letter="P">P</button>
+                    <button class="letter-btn" data-letter="Q">Q</button>
+                    <button class="letter-btn" data-letter="R">R</button>
+                    <button class="letter-btn" data-letter="S">S</button>
+                    <button class="letter-btn" data-letter="T">T</button>
+                    <button class="letter-btn" data-letter="U">U</button>
+                    <button class="letter-btn" data-letter="V">V</button>
+                    <button class="letter-btn" data-letter="W">W</button>
+                    <button class="letter-btn" data-letter="X">X</button>
+                    <button class="letter-btn" data-letter="Y">Y</button>
+                    <button class="letter-btn" data-letter="Z">Z</button>
+                </div>
+            </aside>
+
+            <!-- Center Content -->
+            <section class="content">
+                <!-- Playlist Name Input -->
+                <div class="playlist-header">
+                    <input 
+                        type="text" 
+                        id="playlistName" 
+                        class="playlist-input" 
+                        placeholder="Nome da Playlist"
+                        maxlength="100"
+                    >
+                    <span class="char-count"><span id="charCount">0</span>/100</span>
+                </div>
+
+                <!-- Current Letter Section -->
+                <div class="letter-section">
+                    <div class="letter-title">
+                        <h2 id="currentLetter">Letra A</h2>
+                        <span class="song-count">(<span id="songCount">0</span>/5 músicas)</span>
+                    </div>
+
+                    <!-- Songs List -->
+                    <div class="songs-list" id="songsList">
+                        <div class="empty-state">
+                            <p>Nenhuma música adicionada ainda</p>
+                        </div>
+                    </div>
+
+                    <!-- Add Song Button -->
+                    <button class="add-song-btn" id="addSongBtn">+ Adicionar Música</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <button class="create-playlist-btn" id="createPlaylistBtn" disabled>
+                Criar Playlist no Spotify
+            </button>
+        </footer>
+    </div>
+
+    <!-- Search Modal -->
+    <div class="modal" id="searchModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Buscar Música</h3>
+                <button class="modal-close" id="closeModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    class="search-input" 
+                    placeholder="Digite o nome da música ou artista..."
+                    autocomplete="off"
+                >
+                <div class="search-results" id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p id="loadingText">Carregando...</p>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
