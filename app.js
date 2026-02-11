@@ -117,7 +117,8 @@ async function startSpotifyLoginPKCE() {
         redirect_uri: SPOTIFY_REDIRECT_URI,
         code_challenge_method: 'S256',
         code_challenge: challenge,
-        scope: SPOTIFY_SCOPES.join(' ')
+        scope: SPOTIFY_SCOPES.join(' '),
+        show_dialog: 'true'
     });
 
     window.location.href = `${SPOTIFY_AUTH_URL}?${params.toString()}`;
@@ -510,7 +511,7 @@ async function fetchJsonWithDebug(url, options = {}) {
     if (!res.ok) {
         const msg = bodyJson?.error?.message || bodyJson?.message || bodyText || `${res.status}`;
         const detail = bodyJson?.error?.status || res.status;
-        console.error('Spotify request failed:', { url, status: res.status, bodyJson, bodyText });
+        console.error('Spotify error detail:', { url, status: res.status, bodyJson });
         throw { status: res.status, detail, msg, url, bodyJson, bodyText };
     }
     return bodyJson ?? (bodyText ? JSON.parse(bodyText) : null);
@@ -558,7 +559,8 @@ async function createPlaylist() {
         const me = await spotifyFetch(`${SPOTIFY_API_BASE}/me`, {
             headers: { 'Authorization': `Bearer ${state.accessToken}` }
         });
-        console.log('LOGGED USER:', me.display_name, me.email, me.id);
+        console.log('ME:', me.display_name, me.email, me.id);
+        showToast(`Conectado como: ${me.email || me.id}`, 'info');
         state.user = me;
 
         if (!state.user?.id) throw { status: 0, msg: 'Resposta /me sem user.id', bodyJson: state.user };
@@ -619,16 +621,35 @@ async function createPlaylist() {
     } catch (error) {
         console.error('Spotify error:', error);
 
-        let msg = error?.msg || error?.message || 'Erro desconhecido';
+        let msg = error?.bodyJson?.error?.message || error?.msg || error?.message || 'Erro desconhecido';
         const status = error?.status || '??';
 
         if (status === 403) {
-            msg = '403: Sem permissão (Dev mode ou Scopes). Desconectando...';
+            const lowerMsg = msg.toLowerCase();
+            
+            if (lowerMsg.includes('user not registered')) {
+                msg = 'Conta não está no User Management. Adicione o e-mail e reconecte.';
+                showToast(msg, 'error');
+                setTimeout(() => logoutSpotify(), 4000);
+                showLoading(false);
+                return;
+            }
+
+            if (lowerMsg.includes('insufficient client scope')) {
+                msg = 'Falta permissão de playlist. Reautenticando...';
+                showToast(msg, 'error');
+                logoutSpotify();
+                setTimeout(() => startSpotifyLoginPKCE(), 2000);
+                showLoading(false);
+                return;
+            }
+
+            msg = `403: ${msg}`;
             showToast(msg, 'error');
             setTimeout(() => logoutSpotify(), 3000);
+        } else {
+            showToast(`Erro Spotify (${status}): ${msg}`, 'error');
         }
-
-        showToast(`Erro Spotify (${status}): ${msg}`, 'error');
         showLoading(false);
     }
 }
