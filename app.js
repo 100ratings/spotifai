@@ -43,6 +43,7 @@ const state = {
 
 const elements = {
     spotifyBtn: document.getElementById('spotifyBtn'),
+    resetBtn: document.getElementById('resetBtn'),
     playlistInput: document.getElementById('playlistName'),
     charCount: document.getElementById('charCount'),
     currentLetter: document.getElementById('currentLetter'),
@@ -291,10 +292,12 @@ function updateSpotifyButton() {
         elements.spotifyBtn.textContent = '✓ Conectado';
         elements.spotifyBtn.classList.add('connected');
         elements.createPlaylistBtn.disabled = false;
+        elements.resetBtn.style.display = 'block';
     } else {
         elements.spotifyBtn.textContent = 'Conectar com Spotify';
         elements.spotifyBtn.classList.remove('connected');
         elements.createPlaylistBtn.disabled = true;
+        elements.resetBtn.style.display = 'none';
     }
 }
 
@@ -305,6 +308,14 @@ function updateSpotifyButton() {
 function setupEventListeners() {
     // Spotify button
     elements.spotifyBtn.addEventListener('click', spotifyLogin);
+
+    // Reset button (Hard Reset)
+    elements.resetBtn.addEventListener('click', () => {
+        if (confirm('Isso vai desconectar e limpar todos os dados locais do Spotify. Continuar?')) {
+            logoutSpotify();
+            window.location.reload();
+        }
+    });
 
     // Playlist name input
     elements.playlistInput.addEventListener('input', (e) => {
@@ -499,6 +510,7 @@ async function fetchJsonWithDebug(url, options = {}) {
     if (!res.ok) {
         const msg = bodyJson?.error?.message || bodyJson?.message || bodyText || `${res.status}`;
         const detail = bodyJson?.error?.status || res.status;
+        console.error('Spotify request failed:', { url, status: res.status, bodyJson, bodyText });
         throw { status: res.status, detail, msg, url, bodyJson, bodyText };
     }
     return bodyJson ?? (bodyText ? JSON.parse(bodyText) : null);
@@ -542,16 +554,14 @@ async function createPlaylist() {
     showLoading(true, 'Criando playlist...');
 
     try {
-        // 1. Obter dados do usuário (se não tiver)
-        if (!state.user || !state.user.id) {
-            state.user = await spotifyFetch(`${SPOTIFY_API_BASE}/me`, {
-                headers: { 'Authorization': `Bearer ${state.accessToken}` }
-            });
+        // 1. Obter/Verificar dados do usuário (Diagnóstico)
+        const me = await spotifyFetch(`${SPOTIFY_API_BASE}/me`, {
+            headers: { 'Authorization': `Bearer ${state.accessToken}` }
+        });
+        console.log('LOGGED USER:', me.display_name, me.email, me.id);
+        state.user = me;
 
-            if (!state.user?.id) {
-                throw { status: 0, msg: 'Resposta /me sem user.id', bodyJson: state.user };
-            }
-        }
+        if (!state.user?.id) throw { status: 0, msg: 'Resposta /me sem user.id', bodyJson: state.user };
 
         // 2. Criar playlist
         const playlist = await spotifyFetch(
@@ -612,7 +622,11 @@ async function createPlaylist() {
         let msg = error?.msg || error?.message || 'Erro desconhecido';
         const status = error?.status || '??';
 
-        if (status === 403) msg = '403: App em dev mode? Verifique Users no Dashboard ou reconecte.';
+        if (status === 403) {
+            msg = '403: Sem permissão (Dev mode ou Scopes). Desconectando...';
+            showToast(msg, 'error');
+            setTimeout(() => logoutSpotify(), 3000);
+        }
 
         showToast(`Erro Spotify (${status}): ${msg}`, 'error');
         showLoading(false);
