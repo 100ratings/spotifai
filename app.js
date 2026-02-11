@@ -3,7 +3,7 @@
 // ========================================
 
 const SPOTIFY_CLIENT_ID = '205ef91bb291485ea4b22444a199e32c';
-const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname; // ex: https://100ratings.github.io/spotifai/
+const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/?$/, '/');
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
@@ -329,7 +329,7 @@ function setupEventListeners() {
     });
 
     // Search input
-    elements.searchInput.addEventListener('input', debounce(searchSongs, 300));
+    elements.searchInput.addEventListener('input', debounce((e) => searchSongs(e.target.value), 300));
 
     // Create playlist button
     elements.createPlaylistBtn.addEventListener('click', createPlaylist);
