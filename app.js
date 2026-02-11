@@ -2,7 +2,7 @@
 // CONFIGURAÇÃO SPOTIFY
 // ========================================
 
-const SPOTIFY_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+const SPOTIFY_CLIENT_ID = '205ef91bb291485ea4b22444a199e32c';
 const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
