@@ -64,6 +64,7 @@ const elements = {
 // ========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('REDIRECT:', SPOTIFY_REDIRECT_URI);
     state.init();
 
     // 1) Trata callback do Spotify (PKCE)
@@ -487,6 +488,39 @@ function displaySearchResults(tracks) {
 // CRIAR PLAYLIST
 // ========================================
 
+async function fetchJsonWithDebug(url, options = {}) {
+    const res = await fetch(url, options);
+    let bodyText = '';
+    let bodyJson = null;
+
+    try { bodyText = await res.clone().text(); } catch {}
+    try { bodyJson = bodyText ? JSON.parse(bodyText) : null; } catch {}
+
+    if (!res.ok) {
+        const msg = bodyJson?.error?.message || bodyJson?.message || bodyText || `${res.status}`;
+        const detail = bodyJson?.error?.status || res.status;
+        throw { status: res.status, detail, msg, url, bodyJson, bodyText };
+    }
+    return bodyJson ?? (bodyText ? JSON.parse(bodyText) : null);
+}
+
+async function spotifyFetch(url, options = {}) {
+    try {
+        return await fetchJsonWithDebug(url, options);
+    } catch (e) {
+        if (e.status === 401) {
+            const ok = await refreshAccessToken();
+            if (ok) {
+                if (options.headers && options.headers['Authorization']) {
+                    options.headers['Authorization'] = `Bearer ${state.accessToken}`;
+                }
+                return await fetchJsonWithDebug(url, options);
+            }
+        }
+        throw e;
+    }
+}
+
 async function createPlaylist() {
     const ok = await ensureValidToken();
     if (!ok) {
@@ -508,23 +542,19 @@ async function createPlaylist() {
     showLoading(true, 'Criando playlist...');
 
     try {
-        // 1. Obter dados do usuário
-        if (!state.user) {
-            const userResponse = await fetch(`${SPOTIFY_API_BASE}/me`, {
+        // 1. Obter dados do usuário (se não tiver)
+        if (!state.user || !state.user.id) {
+            state.user = await spotifyFetch(`${SPOTIFY_API_BASE}/me`, {
                 headers: { 'Authorization': `Bearer ${state.accessToken}` }
             });
-            if (userResponse.status === 401) {
-                const refreshed = await refreshAccessToken();
-                if (refreshed) return createPlaylist();
-                logoutSpotify();
-                showToast('Sessão expirada. Reconecte ao Spotify.', 'error');
-                return;
+
+            if (!state.user?.id) {
+                throw { status: 0, msg: 'Resposta /me sem user.id', bodyJson: state.user };
             }
-            state.user = await userResponse.json();
         }
 
         // 2. Criar playlist
-        const playlistResponse = await fetch(
+        const playlist = await spotifyFetch(
             `${SPOTIFY_API_BASE}/users/${state.user.id}/playlists`,
             {
                 method: 'POST',
@@ -540,10 +570,6 @@ async function createPlaylist() {
             }
         );
 
-        if (!playlistResponse.ok) throw new Error('Erro ao criar playlist');
-
-        const playlist = await playlistResponse.json();
-
         // 3. Adicionar músicas
         const trackUris = [];
         for (const letter in state.songs) {
@@ -554,7 +580,7 @@ async function createPlaylist() {
 
         for (let i = 0; i < trackUris.length; i += 100) {
             const batch = trackUris.slice(i, i + 100);
-            await fetch(
+            await spotifyFetch(
                 `${SPOTIFY_API_BASE}/playlists/${playlist.id}/tracks`,
                 {
                     method: 'POST',
@@ -581,8 +607,14 @@ async function createPlaylist() {
         }, 2000);
 
     } catch (error) {
-        console.error('Erro ao criar playlist:', error);
-        showToast('Erro ao criar playlist. Tente novamente.', 'error');
+        console.error('Spotify error:', error);
+
+        let msg = error?.msg || error?.message || 'Erro desconhecido';
+        const status = error?.status || '??';
+
+        if (status === 403) msg = '403: App em dev mode? Verifique Users no Dashboard ou reconecte.';
+
+        showToast(`Erro Spotify (${status}): ${msg}`, 'error');
         showLoading(false);
     }
 }
