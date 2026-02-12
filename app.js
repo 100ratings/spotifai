@@ -2,8 +2,13 @@
 // CONFIGURAÇÃO SPOTIFY
 // ========================================
 
+// ⚠️ IMPORTANTE: Substitua pelo seu Client ID do Spotify Developer Dashboard
+// Acesse: https://developer.spotify.com/dashboard
 const SPOTIFY_CLIENT_ID = '205ef91bb291485ea4b22444a199e32c';
-const SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname.replace('index.html', '').replace(/\/?$/, '/');
+
+// Redirect URI simplificada para evitar inconsistências
+const SPOTIFY_REDIRECT_URI = window.location.origin + '/';
+
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
@@ -65,7 +70,12 @@ const elements = {
 // ========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('REDIRECT:', SPOTIFY_REDIRECT_URI);
+    console.log('🎵 Song Alphabet iniciado');
+    console.log('📍 Redirect URI:', SPOTIFY_REDIRECT_URI);
+    
+    // Validar configuração
+    validateConfiguration();
+    
     state.init();
 
     // 1) Trata callback do Spotify (PKCE)
@@ -79,6 +89,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateSpotifyButton();
     renderLetterSection();
 });
+
+// ========================================
+// VALIDAÇÃO DE CONFIGURAÇÃO
+// ========================================
+
+function validateConfiguration() {
+    // Verificar se Client ID foi configurado
+    if (!SPOTIFY_CLIENT_ID || SPOTIFY_CLIENT_ID === 'YOUR_CLIENT_ID_HERE') {
+        console.error('❌ Client ID não configurado!');
+        showToast('⚠️ Configure o Client ID no arquivo app.js', 'error');
+        return false;
+    }
+    
+    console.log('✅ Configuração válida');
+    return true;
+}
 
 // ========================================
 // SPOTIFY AUTH (PKCE)
@@ -121,6 +147,7 @@ async function startSpotifyLoginPKCE() {
         show_dialog: 'true'
     });
 
+    console.log('🔐 Iniciando autenticação PKCE...');
     window.location.href = `${SPOTIFY_AUTH_URL}?${params.toString()}`;
 }
 
@@ -144,6 +171,7 @@ async function exchangeCodeForToken(code) {
 
     if (!resp.ok) {
         const text = await resp.text().catch(() => '');
+        console.error('❌ Erro no token exchange:', resp.status, text);
         throw new Error(`Falha no token exchange (${resp.status}): ${text}`);
     }
 
@@ -158,10 +186,15 @@ async function exchangeCodeForToken(code) {
     localStorage.setItem('spotify_token_expires_at', String(state.tokenExpiresAt));
 
     localStorage.removeItem('pkce_verifier');
+    
+    console.log('✅ Token obtido com sucesso');
 }
 
 async function refreshAccessToken() {
-    if (!state.refreshToken) return false;
+    if (!state.refreshToken) {
+        console.warn('⚠️ Sem refresh token disponível');
+        return false;
+    }
 
     const body = new URLSearchParams({
         client_id: SPOTIFY_CLIENT_ID,
@@ -175,7 +208,10 @@ async function refreshAccessToken() {
         body
     });
 
-    if (!resp.ok) return false;
+    if (!resp.ok) {
+        console.error('❌ Falha ao renovar token:', resp.status);
+        return false;
+    }
 
     const data = await resp.json();
     state.accessToken = data.access_token;
@@ -190,6 +226,7 @@ async function refreshAccessToken() {
         localStorage.setItem('spotify_refresh_token', state.refreshToken);
     }
 
+    console.log('✅ Token renovado com sucesso');
     return true;
 }
 
@@ -201,19 +238,31 @@ function loadTokensFromStorage() {
     state.accessToken = at || null;
     state.refreshToken = rt || null;
     state.tokenExpiresAt = exp || 0;
+    
+    if (state.accessToken) {
+        console.log('📦 Tokens restaurados do localStorage');
+    }
 }
 
 async function ensureValidToken() {
     // sem token
-    if (!state.accessToken) return false;
+    if (!state.accessToken) {
+        console.warn('⚠️ Sem token de acesso');
+        return false;
+    }
 
     // ainda válido (com folga de 30s)
-    if (Date.now() < (state.tokenExpiresAt - 30000)) return true;
+    if (Date.now() < (state.tokenExpiresAt - 30000)) {
+        return true;
+    }
 
+    console.log('🔄 Token expirado, tentando renovar...');
+    
     // tenta refresh
     const ok = await refreshAccessToken();
     if (!ok) {
         // limpa se falhar
+        console.error('❌ Falha ao renovar token, desconectando...');
         logoutSpotify();
         return false;
     }
@@ -223,7 +272,12 @@ async function ensureValidToken() {
 async function handleSpotifyCallbackPKCE() {
     // 1) Se veio erro no hash (ex: #error=...)
     if (window.location.hash && window.location.hash.includes('error=')) {
-        showToast('Erro ao conectar com Spotify. Verifique Redirect URI e tente de novo.', 'error');
+        const errorMatch = window.location.hash.match(/error=([^&]+)/);
+        const error = errorMatch ? decodeURIComponent(errorMatch[1]) : 'desconhecido';
+        
+        console.error('❌ Erro no callback:', error);
+        showToast(`Erro ao conectar: ${error}. Verifique a configuração no Dashboard.`, 'error');
+        
         // limpa hash
         window.history.replaceState({}, document.title, window.location.pathname);
         loadTokensFromStorage();
@@ -238,10 +292,10 @@ async function handleSpotifyCallbackPKCE() {
         showLoading(true, 'Conectando ao Spotify...');
         try {
             await exchangeCodeForToken(code);
-            showToast('Conectado com sucesso! ✅', 'success');
+            showToast('✅ Conectado com sucesso!', 'success');
         } catch (e) {
-            console.error(e);
-            showToast('Falha ao autenticar. Confirme a Redirect URI no Dashboard.', 'error');
+            console.error('❌ Erro na autenticação:', e);
+            showToast('❌ Falha ao autenticar. Verifique:\n1. Client ID correto\n2. Redirect URI cadastrada\n3. Usuário no User Management', 'error');
         } finally {
             showLoading(false);
             // remove ?code=... da URL
@@ -272,6 +326,7 @@ function logoutSpotify() {
     localStorage.removeItem('spotify_token_expires_at');
     localStorage.removeItem('user_data');
 
+    console.log('🚪 Desconectado do Spotify');
     updateSpotifyButton();
 }
 
@@ -285,6 +340,11 @@ async function spotifyLogin() {
         showToast('Desconectado do Spotify', 'info');
         return;
     }
+    
+    if (!validateConfiguration()) {
+        return;
+    }
+    
     await startSpotifyLoginPKCE();
 }
 
@@ -448,7 +508,8 @@ async function searchSongs(query) {
 
     const ok = await ensureValidToken();
     if (!ok) {
-        showToast('Conecte ao Spotify primeiro!', 'error');
+        showToast('❌ Conecte ao Spotify primeiro!', 'error');
+        closeSearchModal();
         return;
     }
 
@@ -463,20 +524,23 @@ async function searchSongs(query) {
         if (!response.ok) {
             if (response.status === 401) {
                 // tenta refresh e repete 1x
+                console.log('🔄 Token inválido durante busca, tentando renovar...');
                 const refreshed = await refreshAccessToken();
                 if (refreshed) return searchSongs(query);
+                
                 logoutSpotify();
-                showToast('Sessão expirada. Reconecte ao Spotify.', 'error');
+                showToast('❌ Sessão expirada. Reconecte ao Spotify.', 'error');
+                closeSearchModal();
                 return;
             }
-            throw new Error('Erro na busca');
+            throw new Error(`Erro na busca: ${response.status}`);
         }
 
         const data = await response.json();
         displaySearchResults(data.tracks.items);
     } catch (error) {
-        console.error('Erro ao buscar músicas:', error);
-        showToast('Erro ao buscar músicas', 'error');
+        console.error('❌ Erro ao buscar músicas:', error);
+        showToast('❌ Erro ao buscar músicas. Tente novamente.', 'error');
     } finally {
         showLoading(false);
     }
@@ -511,7 +575,15 @@ async function fetchJsonWithDebug(url, options = {}) {
     if (!res.ok) {
         const msg = bodyJson?.error?.message || bodyJson?.message || bodyText || `${res.status}`;
         const detail = bodyJson?.error?.status || res.status;
-        console.error('Spotify error detail:', { url, status: res.status, bodyJson });
+        
+        console.error('❌ Erro Spotify:', {
+            url,
+            status: res.status,
+            message: msg,
+            detail: detail,
+            body: bodyJson
+        });
+        
         throw { status: res.status, detail, msg, url, bodyJson, bodyText };
     }
     return bodyJson ?? (bodyText ? JSON.parse(bodyText) : null);
@@ -522,6 +594,7 @@ async function spotifyFetch(url, options = {}) {
         return await fetchJsonWithDebug(url, options);
     } catch (e) {
         if (e.status === 401) {
+            console.log('🔄 Token inválido, tentando renovar...');
             const ok = await refreshAccessToken();
             if (ok) {
                 if (options.headers && options.headers['Authorization']) {
@@ -537,35 +610,43 @@ async function spotifyFetch(url, options = {}) {
 async function createPlaylist() {
     const ok = await ensureValidToken();
     if (!ok) {
-        showToast('Conecte ao Spotify primeiro!', 'error');
+        showToast('❌ Conecte ao Spotify primeiro!', 'error');
         return;
     }
 
     if (!state.playlistName.trim()) {
-        showToast('Digite um nome para a playlist!', 'error');
+        showToast('❌ Digite um nome para a playlist!', 'error');
         return;
     }
 
     const totalSongs = Object.values(state.songs).reduce((sum, songs) => sum + songs.length, 0);
     if (totalSongs === 0) {
-        showToast('Adicione pelo menos uma música!', 'error');
+        showToast('❌ Adicione pelo menos uma música!', 'error');
         return;
     }
 
     showLoading(true, 'Criando playlist...');
 
     try {
-        // 1. Obter/Verificar dados do usuário (Diagnóstico)
+        // 1. Obter dados do usuário
+        console.log('📡 Obtendo dados do usuário...');
         const me = await spotifyFetch(`${SPOTIFY_API_BASE}/me`, {
             headers: { 'Authorization': `Bearer ${state.accessToken}` }
         });
-        console.log('ME:', me.display_name, me.email, me.id);
-        showToast(`Conectado como: ${me.email || me.id}`, 'info');
+        
+        console.log('✅ Usuário:', me.display_name || me.id, '|', me.email);
         state.user = me;
 
-        if (!state.user?.id) throw { status: 0, msg: 'Resposta /me sem user.id', bodyJson: state.user };
+        if (!state.user?.id) {
+            throw { 
+                status: 0, 
+                msg: 'Resposta /me sem user.id', 
+                bodyJson: state.user 
+            };
+        }
 
         // 2. Criar playlist
+        console.log('📡 Criando playlist...');
         const playlist = await spotifyFetch(
             `${SPOTIFY_API_BASE}/users/${state.user.id}/playlists`,
             {
@@ -576,13 +657,16 @@ async function createPlaylist() {
                 },
                 body: JSON.stringify({
                     name: state.playlistName,
-                    description: 'Criada com Song Alphabet',
+                    description: 'Criada com Song Alphabet 🎵',
                     public: false
                 })
             }
         );
 
+        console.log('✅ Playlist criada:', playlist.id);
+
         // 3. Adicionar músicas
+        console.log('📡 Adicionando músicas...');
         const trackUris = [];
         for (const letter in state.songs) {
             for (const song of state.songs[letter]) {
@@ -590,6 +674,7 @@ async function createPlaylist() {
             }
         }
 
+        // Adicionar em lotes de 100 (limite da API)
         for (let i = 0; i < trackUris.length; i += 100) {
             const batch = trackUris.slice(i, i + 100);
             await spotifyFetch(
@@ -605,9 +690,11 @@ async function createPlaylist() {
             );
         }
 
+        console.log('✅ Músicas adicionadas:', trackUris.length);
         showLoading(false);
-        showToast(`Playlist "${state.playlistName}" criada com sucesso! 🎉`, 'success');
+        showToast(`🎉 Playlist "${state.playlistName}" criada com sucesso!`, 'success');
 
+        // Limpar dados após 2 segundos
         setTimeout(() => {
             state.songs = {};
             state.init();
@@ -619,7 +706,7 @@ async function createPlaylist() {
         }, 2000);
 
     } catch (error) {
-        console.error('Spotify error:', error);
+        console.error('❌ Erro ao criar playlist:', error);
 
         let msg = error?.bodyJson?.error?.message || error?.msg || error?.message || 'Erro desconhecido';
         const status = error?.status || '??';
@@ -627,16 +714,30 @@ async function createPlaylist() {
         if (status === 403) {
             const lowerMsg = msg.toLowerCase();
             
-            if (lowerMsg.includes('user not registered')) {
-                msg = 'Conta não está no User Management. Adicione o e-mail e reconecte.';
+            // Caso 1: Usuário não registrado no Dashboard
+            if (lowerMsg.includes('user not registered') || lowerMsg.includes('not registered in the developer dashboard')) {
+                msg = '🚫 ERRO 403: Usuário não cadastrado no Developer Dashboard\n\n';
+                msg += '📋 SOLUÇÃO:\n';
+                msg += '1. Acesse: https://developer.spotify.com/dashboard\n';
+                msg += '2. Selecione sua aplicação\n';
+                msg += '3. Vá em "User Management"\n';
+                msg += '4. Adicione seu e-mail do Spotify\n';
+                msg += '5. Salve e reconecte aqui\n\n';
+                msg += '💡 Isso é necessário durante o desenvolvimento.';
+                
                 showToast(msg, 'error');
-                setTimeout(() => logoutSpotify(), 4000);
+                console.error('📋 Instruções:', msg);
+                
+                setTimeout(() => logoutSpotify(), 5000);
                 showLoading(false);
                 return;
             }
 
+            // Caso 2: Escopo insuficiente
             if (lowerMsg.includes('insufficient client scope')) {
-                msg = 'Falta permissão de playlist. Reautenticando...';
+                msg = '🚫 ERRO 403: Permissões insuficientes\n\n';
+                msg += 'Reconectando para solicitar permissões corretas...';
+                
                 showToast(msg, 'error');
                 logoutSpotify();
                 setTimeout(() => startSpotifyLoginPKCE(), 2000);
@@ -644,12 +745,24 @@ async function createPlaylist() {
                 return;
             }
 
-            msg = `403: ${msg}`;
+            // Caso 3: Outro erro 403
+            msg = `🚫 ERRO 403: ${msg}\n\n`;
+            msg += 'Verifique:\n';
+            msg += '• Usuário no User Management\n';
+            msg += '• Permissões corretas\n';
+            msg += '• Aplicação não está em Review Mode';
+            
             showToast(msg, 'error');
-            setTimeout(() => logoutSpotify(), 3000);
+            setTimeout(() => logoutSpotify(), 4000);
+        } else if (status === 401) {
+            msg = '🔒 Sessão expirada. Reconectando...';
+            showToast(msg, 'error');
+            logoutSpotify();
+            setTimeout(() => startSpotifyLoginPKCE(), 2000);
         } else {
-            showToast(`Erro Spotify (${status}): ${msg}`, 'error');
+            showToast(`❌ Erro ${status}: ${msg}`, 'error');
         }
+        
         showLoading(false);
     }
 }
@@ -670,7 +783,10 @@ function showLoading(show, text = 'Carregando...') {
 function showToast(message, type = 'info') {
     elements.toast.textContent = message;
     elements.toast.className = `toast show ${type}`;
-    setTimeout(() => elements.toast.classList.remove('show'), 3000);
+    
+    // Ajustar duração baseado no tamanho da mensagem
+    const duration = message.length > 100 ? 6000 : 3000;
+    setTimeout(() => elements.toast.classList.remove('show'), duration);
 }
 
 function debounce(func, wait) {
@@ -704,5 +820,6 @@ function restoreFromLocalStorage() {
         state.playlistName = data.playlistName || '';
         elements.playlistInput.value = state.playlistName;
         elements.charCount.textContent = state.playlistName.length;
+        console.log('📦 Dados restaurados do localStorage');
     }
 }
