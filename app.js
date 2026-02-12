@@ -7,7 +7,7 @@
 const SPOTIFY_CLIENT_ID = '205ef91bb291485ea4b22444a199e32c';
 
 // Redirect URI simplificada para evitar inconsistências
-const SPOTIFY_REDIRECT_URI = window.location.origin + '/';
+const SPOTIFY_REDIRECT_URI = 'http://127.0.0.1:8000/';
 
 const SPOTIFY_AUTH_URL = 'https://accounts.spotify.com/authorize';
 const SPOTIFY_TOKEN_URL = 'https://accounts.spotify.com/api/token';
